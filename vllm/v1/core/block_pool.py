@@ -111,7 +111,7 @@ class BlockHashToBlockMap:
         self,
         key: BlockHashWithGroupId,
         block: KVCacheBlock,
-        allowed_tenants: set[str] | None = None,
+        allowed_tenants: set[str] | set[object] | None = None,
     ) -> None:
         """
         Inserts the KVCacheBlock to the cache
@@ -178,13 +178,14 @@ class BlockHashToBlockMap:
         self,
         node_hash: BlockHashWithGroupId,
         threshold: int = 5,
+        rand_it: bool = True
     ) -> list[int]:
         nodes = self.hash_to_nodes_map.get(node_hash)
         if nodes is None or len(nodes) < threshold:
             return []
         
-        # Only promote to global at a 20% chance to slightly obfuscate results.
-        if random.randint(1, 5) != 1:
+        # Only promote to global at a (len(nodes)-threshold)/len(nodes) chance to slightly obfuscate results.
+        if rand_it and random.randint(1, len(nodes)) >= threshold:
             return []
 
         canonical_block_id = min(nodes)
@@ -377,8 +378,8 @@ class BlockPool:
                 blk,
                 allowed_tenants=allowed_tenants,
             )
-            self.try_promote_cached_hash_to_global(block_hash, kv_cache_group_id, threshold=3)
-            
+            self.try_promote_cached_hash_to_global(block_hash, kv_cache_group_id, threshold=5)
+
             if new_hashes is not None:
                 new_hashes.append(maybe_convert_block_hash(block_hash))
 
@@ -434,7 +435,7 @@ class BlockPool:
             self,
             block_hash: BlockHash,
             kv_cache_group_id: int,
-            threshold: int = 3,
+            threshold: int = 5,
         ) -> None: # Changed return type to None
             """Promote duplicate hash entries and free the redundant GPU memory."""
             node_hash = make_block_hash_with_group_id(block_hash, kv_cache_group_id)
